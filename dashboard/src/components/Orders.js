@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosConfig";
 import { Link } from "react-router-dom";
 import Notification from "./Notification";
-import ConfirmDialog from "./ConfirmDialog";
 
 const Orders = () => {
   const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState(null);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [orderToCancel, setOrderToCancel] = useState(null);
 
   useEffect(() => {
     fetchOrders();
@@ -22,7 +19,7 @@ const Orders = () => {
 
   const fetchOrders = async () => {
     try {
-      const response = await axios.get("http://localhost:3002/allOrders");
+      const response = await axiosInstance.get("/allOrders");
       console.log("✅ Orders data:", response.data);
       setAllOrders(response.data);
       setLoading(false);
@@ -37,7 +34,7 @@ const Orders = () => {
     if (!window.confirm("Are you sure you want to cancel this order?")) return;
 
     try {
-      await axios.delete(`http://localhost:3002/orders/${orderId}`);
+      await axiosInstance.delete(`/orders/${orderId}`);
       showNotification("Order cancelled successfully", "success");
       fetchOrders();
     } catch (err) {

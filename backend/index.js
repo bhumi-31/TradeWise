@@ -20,7 +20,7 @@ const uri = process.env.MONGO_URL;
 
 const app = express();
 
-// ✅ CORS properly configured
+// CORS configuration
 app.use(cors({
     origin: ['http://localhost:3000', 'http://localhost:3001'],
     credentials: true,
@@ -52,16 +52,17 @@ mongoose.connect(uri, {
 });
 
 function setupRoutes() {
-    // ⭐ PUBLIC ROUTES - No authentication needed
+    // PUBLIC ROUTES
     app.use('/api/auth', authRoutes);
     
-    // ✅ DASHBOARD ROUTES - Auth removed for testing
+    // ✅ PROTECTED ROUTES - Require Authentication
     
-    // Holdings
-    app.get("/allHoldings", async(req, res) => {
+    // Get user's holdings
+    app.get("/allHoldings", auth, async(req, res) => {
         try {
-            let allHoldings = await HoldingsModel.find({});
-            console.log("✅ Sent holdings:", allHoldings.length);
+            const userId = req.user._id;
+            let allHoldings = await HoldingsModel.find({ userId });
+            console.log(`✅ Sent ${allHoldings.length} holdings for user:`, req.user.username);
             res.json(allHoldings);
         } catch (error) {
             console.error("❌ Holdings error:", error);
@@ -69,11 +70,12 @@ function setupRoutes() {
         }
     });
 
-    // Positions
-    app.get("/allPositions", async(req, res) => {
+    // Get user's positions
+    app.get("/allPositions", auth, async(req, res) => {
         try {
-            let allPositions = await PositionsModel.find({});
-            console.log("✅ Sent positions:", allPositions.length);
+            const userId = req.user._id;
+            let allPositions = await PositionsModel.find({ userId });
+            console.log(`✅ Sent ${allPositions.length} positions for user:`, req.user.username);
             res.json(allPositions);
         } catch (error) {
             console.error("❌ Positions error:", error);
@@ -81,7 +83,7 @@ function setupRoutes() {
         }
     });
 
-    // Token verification (optional - can keep auth here)
+    // Token verification
     app.get("/verifyToken", auth, async (req, res) => {
         try {
             res.status(200).json({
@@ -95,10 +97,12 @@ function setupRoutes() {
         }
     });
 
-    // ⭐ NEW ORDER - AUTH REMOVED
-    app.post("/newOrder", async(req, res) => {
+    // ✅ NEW ORDER - With Authentication
+    app.post("/newOrder", auth, async(req, res) => {
         try {
             console.log("\n📝 NEW ORDER REQUEST");
+            const userId = req.user._id;
+            console.log("User:", req.user.username);
             console.log("Order details:", req.body);
             
             const { name, qty, price, mode } = req.body;
@@ -111,8 +115,9 @@ function setupRoutes() {
                 });
             }
             
-            // Save order
+            // Save order with userId
             let newOrder = new OrdersModel({
+                userId: userId,
                 name: name,
                 qty: parseInt(qty),
                 price: parseFloat(price),
@@ -123,7 +128,10 @@ function setupRoutes() {
 
             // Update Holdings for BUY
             if (mode === "BUY") {
-                const existingHolding = await HoldingsModel.findOne({ name: name });
+                const existingHolding = await HoldingsModel.findOne({ 
+                    userId: userId, 
+                    name: name 
+                });
                 
                 if (existingHolding) {
                     const newQty = existingHolding.qty + parseInt(qty);
@@ -131,7 +139,7 @@ function setupRoutes() {
                     const newAvg = totalCost / newQty;
                     
                     await HoldingsModel.updateOne(
-                        { name: name },
+                        { userId: userId, name: name },
                         { 
                             qty: newQty,
                             avg: newAvg,
@@ -141,6 +149,7 @@ function setupRoutes() {
                     console.log(`✅ Updated holding: ${name}`);
                 } else {
                     const newHolding = new HoldingsModel({
+                        userId: userId,
                         name: name,
                         qty: parseInt(qty),
                         avg: parseFloat(price),
@@ -155,7 +164,10 @@ function setupRoutes() {
             } 
             // Update Holdings for SELL
             else if (mode === "SELL") {
-                const existingHolding = await HoldingsModel.findOne({ name: name });
+                const existingHolding = await HoldingsModel.findOne({ 
+                    userId: userId, 
+                    name: name 
+                });
                 
                 if (!existingHolding) {
                     return res.status(400).json({
@@ -174,11 +186,11 @@ function setupRoutes() {
                 const newQty = existingHolding.qty - parseInt(qty);
                 
                 if (newQty <= 0) {
-                    await HoldingsModel.deleteOne({ name: name });
+                    await HoldingsModel.deleteOne({ userId: userId, name: name });
                     console.log(`✅ Deleted holding: ${name} (sold all)`);
                 } else {
                     await HoldingsModel.updateOne(
-                        { name: name },
+                        { userId: userId, name: name },
                         { 
                             qty: newQty,
                             price: parseFloat(price)
@@ -203,11 +215,12 @@ function setupRoutes() {
         }
     });
 
-    // All Orders
-    app.get("/allOrders", async(req, res) => {
+    // Get user's orders
+    app.get("/allOrders", auth, async(req, res) => {
         try {
-            let allOrders = await OrdersModel.find({}).sort({ _id: -1 });
-            console.log("✅ Sent orders:", allOrders.length);
+            const userId = req.user._id;
+            let allOrders = await OrdersModel.find({ userId }).sort({ _id: -1 });
+            console.log(`✅ Sent ${allOrders.length} orders for user:`, req.user.username);
             res.json(allOrders);
         } catch (error) {
             console.error("❌ Orders error:", error);
@@ -215,18 +228,24 @@ function setupRoutes() {
         }
     });
 
-    // ⭐ DELETE ORDER - Fixed route
-    app.delete("/orders/:id", async(req, res) => {
+    // Delete order
+    app.delete("/orders/:id", auth, async(req, res) => {
         try {
             const orderId = req.params.id;
-            console.log(`🗑️ Deleting order: ${orderId}`);
+            const userId = req.user._id;
             
-            const result = await OrdersModel.findByIdAndDelete(orderId);
+            console.log(`🗑️ Deleting order: ${orderId} for user: ${req.user.username}`);
+            
+            // Only delete if order belongs to this user
+            const result = await OrdersModel.findOneAndDelete({
+                _id: orderId,
+                userId: userId
+            });
             
             if (!result) {
                 return res.status(404).json({
                     success: false,
-                    message: "Order not found"
+                    message: "Order not found or unauthorized"
                 });
             }
 
@@ -244,18 +263,18 @@ function setupRoutes() {
         }
     });
 
-    // Live update routes
-    app.use('/live', liveUpdateRoutes);
+    // Live update routes (also needs auth)
+    app.use('/live', auth, liveUpdateRoutes);
 
-    console.log("✅ All routes setup complete (auth disabled for testing)");
+    console.log("✅ All routes setup complete with authentication");
 }
 
 function startAutoUpdate() {
     setInterval(async () => {
         try {
             console.log('\n⏰ Auto-update started...');
-            await axios.post('http://localhost:3002/live/updatePrices');
-            console.log('✅ Auto-update completed\n');
+            // Note: Auto-update won't work without token, you may want to handle this differently
+            console.log('⚠️ Auto-update requires user context - skipping for now');
         } catch (error) {
             console.error('❌ Auto-update failed:', error.message);
         }

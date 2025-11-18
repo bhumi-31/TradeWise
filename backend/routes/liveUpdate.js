@@ -1,22 +1,38 @@
+// backend/routes/liveUpdate.js
 const express = require('express');
 const router = express.Router();
 const {HoldingsModel} = require('../model/HoldingsModel');
 const {PositionsModel} = require('../model/PositionsModel');
 const { getCachedQuotes } = require('../services/yahooFinanceService');
 
-// Get live prices
+// ✅ Get live prices for logged-in user
 router.get('/livePrices', async (req, res) => {
   try {
     console.log('\n📊 Live Prices Request Received');
     
-    const holdings = await HoldingsModel.find();
-    const positions = await PositionsModel.find();
+    // ✅ Get userId from authenticated request
+    const userId = req.user._id;
+    console.log('User:', req.user.username);
+    
+    // ✅ Fetch only this user's holdings and positions
+    const holdings = await HoldingsModel.find({ userId });
+    const positions = await PositionsModel.find({ userId });
 
     const holdingSymbols = holdings.map(h => h.name);
     const positionSymbols = positions.map(p => p.name);
     const allSymbols = [...new Set([...holdingSymbols, ...positionSymbols])];
 
     console.log(`🔍 Symbols to fetch: ${allSymbols.join(', ')}`);
+
+    if (allSymbols.length === 0) {
+      return res.json({
+        success: true,
+        holdings: [],
+        positions: [],
+        message: "No holdings or positions found",
+        timestamp: new Date().toISOString()
+      });
+    }
 
     const liveQuotes = await getCachedQuotes(allSymbols);
     const quotesMap = {};
@@ -45,7 +61,7 @@ router.get('/livePrices', async (req, res) => {
         };
       }
       
-      // ✅ If live data not available, use database values
+      // If live data not available, use database values
       console.log(`⚠️ Using database price for ${stock.name}`);
       return {
         _id: stock._id,
@@ -78,7 +94,6 @@ router.get('/livePrices', async (req, res) => {
         };
       }
       
-      // Use database values if live data not available
       return {
         _id: stock._id,
         product: stock.product,
@@ -92,7 +107,7 @@ router.get('/livePrices', async (req, res) => {
       };
     });
 
-    console.log('✅ Live prices sent to frontend\n');
+    console.log(`✅ Live prices sent for user: ${req.user.username}\n`);
 
     res.json({
       success: true,
@@ -110,13 +125,24 @@ router.get('/livePrices', async (req, res) => {
   }
 });
 
-// Update database prices
+// Update database prices for user's stocks
 router.post('/updatePrices', async (req, res) => {
   try {
     console.log('\n🔄 Background Price Update Started');
     
-    const holdings = await HoldingsModel.find();
+    const userId = req.user._id;
+    
+    const holdings = await HoldingsModel.find({ userId });
     const symbols = holdings.map(h => h.name);
+    
+    if (symbols.length === 0) {
+      return res.json({
+        success: true,
+        message: "No holdings to update",
+        timestamp: new Date().toISOString()
+      });
+    }
+    
     const liveQuotes = await getCachedQuotes(symbols);
 
     let updated = 0;
@@ -134,24 +160,27 @@ router.post('/updatePrices', async (req, res) => {
     }
 
     // Same for positions
-    const positions = await PositionsModel.find();
+    const positions = await PositionsModel.find({ userId });
     const posSymbols = positions.map(p => p.name);
-    const posQuotes = await getCachedQuotes(posSymbols);
+    
+    if (posSymbols.length > 0) {
+      const posQuotes = await getCachedQuotes(posSymbols);
 
-    for (let i = 0; i < positions.length; i++) {
-      if (posQuotes[i]) {
-        const netChange = ((posQuotes[i].currentPrice - positions[i].avg) / positions[i].avg * 100).toFixed(2);
-        
-        positions[i].price = posQuotes[i].currentPrice;
-        positions[i].net = `${netChange >= 0 ? '+' : ''}${netChange}%`;
-        positions[i].day = `${posQuotes[i].percentChange >= 0 ? '+' : ''}${posQuotes[i].percentChange.toFixed(2)}%`;
-        positions[i].isLoss = posQuotes[i].percentChange < 0;
-        await positions[i].save();
-        updated++;
+      for (let i = 0; i < positions.length; i++) {
+        if (posQuotes[i]) {
+          const netChange = ((posQuotes[i].currentPrice - positions[i].avg) / positions[i].avg * 100).toFixed(2);
+          
+          positions[i].price = posQuotes[i].currentPrice;
+          positions[i].net = `${netChange >= 0 ? '+' : ''}${netChange}%`;
+          positions[i].day = `${posQuotes[i].percentChange >= 0 ? '+' : ''}${posQuotes[i].percentChange.toFixed(2)}%`;
+          positions[i].isLoss = posQuotes[i].percentChange < 0;
+          await positions[i].save();
+          updated++;
+        }
       }
     }
 
-    console.log(`✅ ${updated} prices updated in database\n`);
+    console.log(`✅ ${updated} prices updated in database for user: ${req.user.username}\n`);
     res.json({ 
       success: true, 
       message: `${updated} prices updated`,

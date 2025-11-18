@@ -1,10 +1,33 @@
 // frontend/src/landing_page/Navbar.js
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function Navbar() {
-    const { isAuthenticated, user } = useAuth(); // ✅ user bhi lo
+    const { isAuthenticated, user, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        console.log('👋 Logging out from frontend...');
+        
+        // Clear all auth data
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('username');
+        
+        // Update auth context
+        logout();
+        
+        console.log('✅ Logged out successfully');
+        
+        // Redirect to home
+        navigate('/');
+        
+        // Show confirmation
+        setTimeout(() => {
+            alert('Logged out successfully!');
+        }, 100);
+    };
 
     return (
         <nav className="navbar navbar-expand-lg border-bottom">
@@ -25,26 +48,46 @@ function Navbar() {
                 </button>
                 <div className="collapse navbar-collapse" id="navbarSupportedContent">
                     <ul className="navbar-nav mb-lg-0 ms-auto">
-                        {/* ✅ Agar logged in nahi to Signup button */}
+                        {/* ✅ Show different options based on login status */}
                         {!isAuthenticated ? (
+                            // ❌ Not logged in - Show Signup button
                             <li className="nav-item">
                                 <Link className="nav-link active" to="/signup">
                                     Signup
                                 </Link>
                             </li>
                         ) : (
-                            // ✅ Agar logged in hai to Dashboard button
-                            <li className="nav-item">
-                                <a 
-                                    className="nav-link active" 
-                                    href="http://localhost:3001"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{ fontWeight: '600' }}
-                                >
-                                    Dashboard
-                                </a>
-                            </li>
+                            // ✅ Logged in - Show Dashboard and Logout
+                            <>
+                                <li className="nav-item">
+                                    <a 
+                                        className="nav-link active" 
+                                        href={`http://localhost:3001?token=${localStorage.getItem('token')}&username=${localStorage.getItem('username')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{ fontWeight: '600' }}
+                                    >
+                                        Dashboard
+                                    </a>
+                                </li>
+                                
+                                {/* ✅ NEW: Logout Button */}
+                                <li className="nav-item">
+                                    <button 
+                                        className="nav-link active btn btn-link"
+                                        onClick={handleLogout}
+                                        style={{ 
+                                            fontWeight: '500',
+                                            cursor: 'pointer',
+                                            border: 'none',
+                                            background: 'none',
+                                            textDecoration: 'none'
+                                        }}
+                                    >
+                                        Logout
+                                    </button>
+                                </li>
+                            </>
                         )}
                         
                         <li className="nav-item">

@@ -44,15 +44,23 @@ const Menu = () => {
   };
 
   const handleLogout = () => {
-    // Clear all data
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("username");
+    if (!window.confirm("Are you sure you want to logout?")) {
+      return;
+    }
     
-    console.log('✅ Logged out successfully');
+    console.log('👋 Starting logout process...');
     
-    // Redirect to frontend login page
-    window.location.href = "http://localhost:3000";
+    // ✅ Step 1: Clear dashboard localStorage
+    localStorage.clear();
+    console.log('✅ Dashboard localStorage cleared');
+    
+    // ✅ Step 2: Redirect to frontend with special logout URL
+    // This will trigger frontend to clear its token
+    const frontendUrl = 'http://localhost:3000/?logout=true';
+    console.log('🔄 Redirecting to:', frontendUrl);
+    
+    // Use replace instead of href to avoid back button issues
+    window.location.replace(frontendUrl);
   };
 
   // Close dropdown if clicked outside

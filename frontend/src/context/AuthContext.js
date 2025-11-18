@@ -1,5 +1,5 @@
-// frontend/src/context/AuthContext.jsx
-import React, { createContext, useState, useEffect, useContext } from 'react';
+// frontend/src/context/AuthContext.js
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext();
@@ -14,30 +14,62 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [token, setToken] = useState(localStorage.getItem('token'));
 
+    // Check for existing token on mount
     useEffect(() => {
-        if (token) {
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-            fetchUser();
-        } else {
-            setLoading(false);
-        }
-    }, [token]);
+        checkAuth();
+        
+        // ✅ Listen for storage changes (when dashboard clears token)
+        const handleStorageChange = (e) => {
+            if (e.key === 'token' || e.key === null) {
+                console.log('🔄 Storage changed - rechecking auth');
+                checkAuth();
+            }
+        };
+        
+        window.addEventListener('storage', handleStorageChange);
+        
+        // ✅ Also check periodically (for same-tab changes)
+        const interval = setInterval(() => {
+            const currentToken = localStorage.getItem('token');
+            if (!currentToken && isAuthenticated) {
+                console.log('⚠️ Token removed - updating auth state');
+                setUser(null);
+                setIsAuthenticated(false);
+            }
+        }, 1000);
+        
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            clearInterval(interval);
+        };
+    }, [isAuthenticated]);
 
-    const fetchUser = async () => {
+    const checkAuth = () => {
         try {
-            const response = await axios.get('http://localhost:3002/api/auth/me');
-            setUser(response.data.user);
-            
-            // ✅ User data localStorage mein save karo
-            localStorage.setItem('user', JSON.stringify(response.data.user));
-            localStorage.setItem('username', response.data.user.username);
-            
+            const token = localStorage.getItem('token');
+            const savedUser = localStorage.getItem('user');
+
+            console.log('🔍 Checking auth...');
+            console.log('Token exists:', !!token);
+            console.log('User exists:', !!savedUser);
+
+            if (token && savedUser) {
+                const userData = JSON.parse(savedUser);
+                setUser(userData);
+                setIsAuthenticated(true);
+                console.log('✅ User authenticated:', userData.username);
+            } else {
+                setUser(null);
+                setIsAuthenticated(false);
+                console.log('⚠️ No authentication found');
+            }
         } catch (error) {
-            console.error('Failed to fetch user:', error);
-            logout();
+            console.error('❌ Auth check error:', error);
+            setUser(null);
+            setIsAuthenticated(false);
         } finally {
             setLoading(false);
         }
@@ -45,76 +77,116 @@ export const AuthProvider = ({ children }) => {
 
     const register = async (username, email, password) => {
         try {
+            console.log('📝 Registering user:', username);
+            
             const response = await axios.post('http://localhost:3002/api/auth/register', {
                 username,
                 email,
                 password
             });
 
-            if (response.data.success) {
-                const newToken = response.data.token;
-                localStorage.setItem('token', newToken);
-                
-                // ✅ User data save karo
-                localStorage.setItem('user', JSON.stringify(response.data.user));
-                localStorage.setItem('username', response.data.user.username);
-                
-                setToken(newToken);
-                setUser(response.data.user);
-                return { success: true };
+            console.log('✅ Registration response:', response.data);
+
+            if (response.data.success && response.data.token) {
+                const { token, user } = response.data;
+
+                // Save to localStorage
+                localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(user));
+                localStorage.setItem('username', user.username);
+
+                console.log('✅ Token saved:', token.substring(0, 30) + '...');
+                console.log('✅ User saved:', user.username);
+
+                // Update state
+                setUser(user);
+                setIsAuthenticated(true);
+
+                return {
+                    success: true,
+                    message: 'Registration successful'
+                };
+            } else {
+                return {
+                    success: false,
+                    message: response.data.message || 'Registration failed'
+                };
             }
         } catch (error) {
-            return { 
-                success: false, 
-                message: error.response?.data?.message || 'Registration failed' 
+            console.error('❌ Registration error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Registration failed'
             };
         }
     };
 
     const login = async (email, password) => {
         try {
+            console.log('🔐 Logging in user:', email);
+
             const response = await axios.post('http://localhost:3002/api/auth/login', {
                 email,
                 password
             });
 
-            if (response.data.success) {
-                const newToken = response.data.token;
-                localStorage.setItem('token', newToken);
-                
-                // ✅ User data save karo
-                localStorage.setItem('user', JSON.stringify(response.data.user));
-                localStorage.setItem('username', response.data.user.username);
-                
-                setToken(newToken);
-                setUser(response.data.user);
-                return { success: true };
+            console.log('✅ Login response:', response.data);
+
+            if (response.data.success && response.data.token) {
+                const { token, user } = response.data;
+
+                // Save to localStorage
+                localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(user));
+                localStorage.setItem('username', user.username);
+
+                console.log('✅ Token saved:', token.substring(0, 30) + '...');
+                console.log('✅ User saved:', user.username);
+
+                // Update state
+                setUser(user);
+                setIsAuthenticated(true);
+
+                return {
+                    success: true,
+                    message: 'Login successful'
+                };
+            } else {
+                return {
+                    success: false,
+                    message: response.data.message || 'Login failed'
+                };
             }
         } catch (error) {
-            return { 
-                success: false, 
-                message: error.response?.data?.message || 'Login failed' 
+            console.error('❌ Login error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Login failed'
             };
         }
     };
 
     const logout = () => {
+        console.log('👋 Logging out...');
+        
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('username');
-        setToken(null);
+        
         setUser(null);
-        delete axios.defaults.headers.common['Authorization'];
+        setIsAuthenticated(false);
+        
+        console.log('✅ Logout complete');
     };
 
     const value = {
         user,
-        token,
+        isAuthenticated,
         loading,
-        login,
         register,
+        login,
         logout,
-        isAuthenticated: !!user
+        checkAuth  // ✅ Export checkAuth function
     };
 
     return (

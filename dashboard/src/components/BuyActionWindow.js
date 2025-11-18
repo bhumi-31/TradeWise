@@ -1,5 +1,5 @@
 import React, { useState, useContext } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosConfig";
 import GeneralContext from "./GeneralContext";
 import Notification from "./Notification";
 import ConfirmDialog from "./ConfirmDialog";
@@ -30,7 +30,7 @@ const BuyActionWindow = ({ uid }) => {
     setError("");
 
     try {
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         "http://localhost:3002/newOrder",
         {
           name: uid,

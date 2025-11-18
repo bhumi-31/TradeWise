@@ -1,8 +1,7 @@
 import React, { useState, useContext } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosConfig"; // ✅ Changed
 import GeneralContext from "./GeneralContext";
 import Notification from "./Notification";
-import ConfirmDialog from "./ConfirmDialog";
 import "./BuyActionWindow.css";
 
 const SellActionWindow = ({ uid }) => {
@@ -11,7 +10,6 @@ const SellActionWindow = ({ uid }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notification, setNotification] = useState(null);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const { closeSellWindow } = useContext(GeneralContext);
 
@@ -29,7 +27,7 @@ const SellActionWindow = ({ uid }) => {
     setError("");
 
     try {
-      const response = await axios.post("http://localhost:3002/newOrder", {
+      const response = await axiosInstance.post("/newOrder", { // ✅ Changed
         name: uid,
         qty: stockQuantity,
         price: stockPrice,

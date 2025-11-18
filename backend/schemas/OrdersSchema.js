@@ -1,6 +1,13 @@
+// backend/schemas/OrdersSchema.js
 const { Schema } = require('mongoose');
 
 const OrdersSchema = new Schema({
+    userId: {
+        type: Schema.Types.ObjectId,
+        ref: 'user',
+        required: true,
+        index: true  // For faster queries
+    },
     name: {
         type: String,
         required: true
@@ -10,7 +17,7 @@ const OrdersSchema = new Schema({
         required: true
     },
     price: {
-        type: Number,  // Changed from String to Number
+        type: Number,
         required: true
     },
     mode: {

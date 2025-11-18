@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosConfig";
 
 const Summary = () => {
   const [holdings, setHoldings] = useState([]);
@@ -36,8 +36,8 @@ const Summary = () => {
   const fetchDashboardData = async () => {
     try {
       const [holdingsRes, ordersRes] = await Promise.all([
-        axios.get("http://localhost:3002/live/livePrices"),
-        axios.get("http://localhost:3002/allOrders")
+        axiosInstance.get("http://localhost:3002/live/livePrices"),
+        axiosInstance.get("http://localhost:3002/allOrders")
       ]);
 
       if (holdingsRes.data.success && holdingsRes.data.holdings) {
@@ -56,6 +56,7 @@ const Summary = () => {
     let totalCurrentValue = 0;
     let marginUsed = 0;
 
+  
     holdings.forEach(holding => {
       const avg = Number(holding.avg) || 0;
       const qty = Number(holding.qty) || 0;

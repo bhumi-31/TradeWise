@@ -1,5 +1,6 @@
+// dashboard/src/components/Holdings.js
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosConfig";
 import { VerticalGraph } from "./VerticalGraph"; 
 
 const Holdings = () => {
@@ -8,10 +9,10 @@ const Holdings = () => {
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
 
-  // ✅ Fetch holdings with live prices
+  // Fetch holdings with live prices
   const fetchHoldings = async () => {
     try {
-      const response = await axios.get("http://localhost:3002/live/livePrices");
+      const response = await axiosInstance.get("/live/livePrices");
       console.log("✅ Live holdings data:", response.data);
       
       if (response.data.success && response.data.holdings) {
@@ -19,13 +20,13 @@ const Holdings = () => {
         setLastUpdate(new Date(response.data.timestamp));
       }
       setLoading(false);
+      setError(null);
     } catch (err) {
       console.error("❌ Error fetching holdings:", err);
-      // Fallback to regular holdings if live fails
-      try {
-        const fallbackResponse = await axios.get("http://localhost:3002/allHoldings");
-        setAllHoldings(fallbackResponse.data);
-      } catch (fallbackErr) {
+      
+      if (err.response?.status === 401) {
+        setError("Session expired. Please login again.");
+      } else {
         setError("Failed to load holdings");
       }
       setLoading(false);
@@ -35,7 +36,7 @@ const Holdings = () => {
   useEffect(() => {
     fetchHoldings();
     
-    // ✅ Auto-refresh every 30 seconds
+    // Auto-refresh every 30 seconds
     const interval = setInterval(() => {
       fetchHoldings();
     }, 30000);
@@ -73,7 +74,19 @@ const Holdings = () => {
     </div>
   );
 
-  if (error) return <p style={{ color: "red" }} className="text-center mt-5">{error}</p>;
+  if (error) return (
+    <div className="text-center mt-5">
+      <div className="alert alert-danger" role="alert">
+        {error}
+      </div>
+      <button 
+        onClick={fetchHoldings} 
+        className="btn btn-primary"
+      >
+        Retry
+      </button>
+    </div>
+  );
 
   const totals = calculateTotals();
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
+import axiosInstance from "../utils/axiosConfig";
 
 const Funds = () => {
   const [funds, setFunds] = useState({
@@ -25,8 +25,8 @@ const Funds = () => {
   const fetchFundsData = async () => {
     try {
       const [holdingsRes, ordersRes] = await Promise.all([
-        axios.get("http://localhost:3002/allHoldings"),
-        axios.get("http://localhost:3002/allOrders")
+        axiosInstance.get("http://localhost:3002/allHoldings"),
+        axiosInstance.get("http://localhost:3002/allOrders")
       ]);
 
       setHoldings(holdingsRes.data);

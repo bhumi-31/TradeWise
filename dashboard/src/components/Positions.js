@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosConfig";
 
 const Positions = () => {
   const [positions, setPositions] = useState([]);
@@ -9,7 +9,7 @@ const Positions = () => {
 
   const fetchPositions = async () => {
     try {
-      const response = await axios.get("http://localhost:3002/live/livePrices");
+      const response = await axiosInstance.get("http://localhost:3002/live/livePrices");
       console.log("✅ Live positions data:", response.data);
       
       if (response.data.success && response.data.positions) {
@@ -21,7 +21,7 @@ const Positions = () => {
       console.error("❌ Error fetching positions:", err);
       // Fallback to regular positions
       try {
-        const fallbackResponse = await axios.get("http://localhost:3002/allPositions");
+        const fallbackResponse = await axiosInstance.get("http://localhost:3002/allPositions");
         setPositions(fallbackResponse.data);
       } catch (fallbackErr) {
         setError("Failed to load positions");
